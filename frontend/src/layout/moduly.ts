@@ -7,6 +7,7 @@ import {
   LayoutDashboard,
   type LucideIcon,
   MessageSquareText,
+  Settings,
   ReceiptText,
   Scale,
   ShoppingCart,
@@ -24,6 +25,7 @@ export type Modul = {
 
 export const PULPIT = { sciezka: '/', nazwa: 'Pulpit', ikona: LayoutDashboard }
 export const UWAGI = { sciezka: '/uwagi', nazwa: 'Uwagi', ikona: MessageSquareText }
+export const USTAWIENIA = { sciezka: '/ustawienia', nazwa: 'Ustawienia', ikona: Settings }
 
 // Kolejność i zakres wg PLAN.md (sekcje 1 i 6).
 export const MODULY: Modul[] = [
@@ -73,3 +75,6 @@ export const MODULY: Modul[] = [
     zakres: ['Sprzedaż i marża (koszt FIFO)', 'Koszty wg kategorii', 'Wartość magazynu', 'Eksport CSV / XLSX'],
   },
 ]
+
+/** Obszary, których może dotyczyć uwaga (moduły + ustawienia). */
+export const OBSZARY: { sciezka: string; nazwa: string }[] = [...MODULY, USTAWIENIA]

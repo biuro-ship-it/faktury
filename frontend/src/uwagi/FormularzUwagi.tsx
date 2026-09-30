@@ -1,6 +1,6 @@
 import { LoaderCircle } from 'lucide-react'
 import { type FormEvent, useState } from 'react'
-import { MODULY } from '../layout/moduly'
+import { OBSZARY } from '../layout/moduly'
 import { TYPY, type TypUwagi, useDodajUwage } from './api'
 
 export function FormularzUwagi({ modulStartowy, onDodano }: { modulStartowy: string | null; onDodano?: () => void }) {
@@ -66,7 +66,7 @@ export function FormularzUwagi({ modulStartowy, onDodano }: { modulStartowy: str
             className="rounded-lg border border-neutral-300 bg-white px-2 py-1.5 text-sm text-tekst focus:border-marka-500 focus:outline-none"
           >
             <option value="">całej aplikacji</option>
-            {MODULY.map((m) => (
+            {OBSZARY.map((m) => (
               <option key={m.sciezka} value={m.sciezka}>
                 {m.nazwa}
               </option>

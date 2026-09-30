@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 
 from app.api import auth, system, uwagi
+from app.api import ustawienia as api_ustawienia
 from app.config import KATALOG_BACKENDU, ustawienia
 
 if sys.platform == "win32":
@@ -37,6 +38,7 @@ def utworz_aplikacje() -> FastAPI:
     aplikacja.include_router(auth.router)
     aplikacja.include_router(system.router)
     aplikacja.include_router(uwagi.router)
+    aplikacja.include_router(api_ustawienia.router)
 
     @aplikacja.get("/{sciezka:path}", include_in_schema=False)
     def frontend(sciezka: str) -> FileResponse:

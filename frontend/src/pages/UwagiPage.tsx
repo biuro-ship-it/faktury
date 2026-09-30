@@ -1,7 +1,7 @@
 import { Bug, Lightbulb, LoaderCircle, Wrench } from 'lucide-react'
 import { useState } from 'react'
 import { NaglowekStrony } from '../layout/NaglowekStrony'
-import { MODULY } from '../layout/moduly'
+import { OBSZARY } from '../layout/moduly'
 import { STATUSY, type StatusUwagi, TYPY, type Uwaga, useUwagi, useZmienStatus } from '../uwagi/api'
 import { FormularzUwagi } from '../uwagi/FormularzUwagi'
 
@@ -22,7 +22,7 @@ const KOLORY_STATUSU: Record<StatusUwagi, string> = {
   odrzucona: 'bg-neutral-100 text-neutral-500',
 }
 
-const nazwaModulu = (sciezka: string | null) => MODULY.find((m) => m.sciezka === sciezka)?.nazwa ?? 'Cała aplikacja'
+const nazwaModulu = (sciezka: string | null) => OBSZARY.find((m) => m.sciezka === sciezka)?.nazwa ?? 'Cała aplikacja'
 
 const formatDaty = new Intl.DateTimeFormat('pl-PL', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
 

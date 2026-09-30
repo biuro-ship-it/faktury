@@ -2,10 +2,11 @@ import { LoaderCircle } from 'lucide-react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router'
 import { useAuth } from './auth/AuthProvider'
 import { AppShell } from './layout/AppShell'
-import { MODULY, UWAGI } from './layout/moduly'
+import { MODULY, USTAWIENIA, UWAGI } from './layout/moduly'
 import { DashboardPage } from './pages/DashboardPage'
 import { LoginPage } from './pages/LoginPage'
 import { ModulPage } from './pages/ModulPage'
+import { UstawieniaPage } from './pages/UstawieniaPage'
 import { UwagiPage } from './pages/UwagiPage'
 
 export function App() {
@@ -29,6 +30,7 @@ export function App() {
             <Route key={m.sciezka} path={`${m.sciezka}/*`} element={<ModulPage modul={m} />} />
           ))}
           <Route path={UWAGI.sciezka} element={<UwagiPage />} />
+          <Route path={`${USTAWIENIA.sciezka}/*`} element={<UstawieniaPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>

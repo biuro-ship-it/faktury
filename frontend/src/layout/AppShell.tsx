@@ -3,14 +3,14 @@ import { useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router'
 import { useAuth, useProfil } from '../auth/AuthProvider'
 import { FormularzUwagi } from '../uwagi/FormularzUwagi'
-import { MODULY, PULPIT, UWAGI } from './moduly'
+import { MODULY, OBSZARY, PULPIT, USTAWIENIA, UWAGI } from './moduly'
 
 /** Pływający przycisk na każdej stronie: uwaga zapisuje się z podpowiedzianym bieżącym modułem. */
 function SzybkaUwaga() {
   const { pathname } = useLocation()
   const [otwarte, setOtwarte] = useState(false)
   const [zapisano, setZapisano] = useState(false)
-  const biezacyModul = MODULY.find((m) => pathname.startsWith(m.sciezka))?.sciezka ?? null
+  const biezacyModul = OBSZARY.find((m) => pathname.startsWith(m.sciezka))?.sciezka ?? null
 
   useEffect(() => {
     if (!zapisano) return
@@ -124,8 +124,9 @@ export function AppShell() {
             <LinkMenu key={m.sciezka} sciezka={m.sciezka} nazwa={m.nazwa} ikona={m.ikona} />
           ))}
           <div className="px-3 pb-1.5 pt-5 text-[11px] font-semibold uppercase tracking-wider text-marka-400">
-            Rozwój
+            System
           </div>
+          <LinkMenu {...USTAWIENIA} />
           <LinkMenu {...UWAGI} />
         </nav>
 

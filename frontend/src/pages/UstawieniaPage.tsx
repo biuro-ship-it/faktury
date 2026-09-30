@@ -1,6 +1,7 @@
 import { Building2, FileText, Landmark, Percent, Plug } from 'lucide-react'
 import { Navigate, NavLink, Route, Routes } from 'react-router'
 import { NaglowekStrony } from '../layout/NaglowekStrony'
+import { USTAWIENIA } from '../layout/moduly'
 import { ZakladkaFaktury } from '../ustawienia/ZakladkaFaktury'
 import { ZakladkaFirma } from '../ustawienia/ZakladkaFirma'
 import { ZakladkaIntegracje } from '../ustawienia/ZakladkaIntegracje'
@@ -15,6 +16,12 @@ const ZAKLADKI = [
   { sciezka: 'integracje', nazwa: 'Integracje', ikona: Plug, element: <ZakladkaIntegracje /> },
 ]
 
+// Ścieżki BEZWZGLĘDNE: React Router v8 rozwiązuje względne linki w trasie z gwiazdką (/ustawienia/*)
+// względem pełnego adresu — `to="firma"` z /ustawienia/firma dawało /ustawienia/firma/firma i pętlę
+// przekierowań (błąd z 2026-09-30).
+const adres = (zakladka: string) => `${USTAWIENIA.sciezka}/${zakladka}`
+const DOMYSLNA = adres('firma')
+
 export function UstawieniaPage() {
   return (
     <>
@@ -24,7 +31,7 @@ export function UstawieniaPage() {
           {ZAKLADKI.map((z) => (
             <NavLink
               key={z.sciezka}
-              to={z.sciezka}
+              to={adres(z.sciezka)}
               className={({ isActive }) =>
                 `flex items-center gap-2 whitespace-nowrap border-b-2 px-3 py-3 text-sm font-medium transition ${
                   isActive ? 'border-zloto-600 text-marka-950' : 'border-transparent text-neutral-500 hover:text-marka-900'
@@ -39,9 +46,9 @@ export function UstawieniaPage() {
       </nav>
       <div className="max-w-6xl p-6 lg:p-8">
         <Routes>
-          <Route index element={<Navigate to="firma" replace />} />
+          <Route index element={<Navigate to={DOMYSLNA} replace />} />
           {ZAKLADKI.map((z) => <Route key={z.sciezka} path={z.sciezka} element={z.element} />)}
-          <Route path="*" element={<Navigate to="firma" replace />} />
+          <Route path="*" element={<Navigate to={DOMYSLNA} replace />} />
         </Routes>
       </div>
     </>

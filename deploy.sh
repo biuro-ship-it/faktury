@@ -46,10 +46,11 @@ ssh "$SERWER" "devil www restart $DOMENA"
 
 echo "==> 6/6 Sprawdzenie"
 KOD=$(curl -s -o /dev/null -w "%{http_code}" "https://$DOMENA/api/me")
-STRONA=$(curl -s -o /dev/null -w "%{http_code}" "https://$DOMENA/")
-echo "   https://$DOMENA/        → $STRONA (oczekiwane 200)"
+# Sam kod 200 nie wystarczy: domyślna strona powitalna mydevil też daje 200.
+STRONA=$(curl -s "https://$DOMENA/" | grep -c "<title>Pluszek Księgowość</title>" || true)
+echo "   https://$DOMENA/        → tytuł aplikacji: $([ "$STRONA" = "1" ] && echo tak || echo NIE)"
 echo "   https://$DOMENA/api/me  → $KOD (oczekiwane 401 — bez tokenu)"
-if [ "$STRONA" != "200" ] || [ "$KOD" != "401" ]; then
+if [ "$STRONA" != "1" ] || [ "$KOD" != "401" ]; then
   echo "!! Coś nie tak — logi: ssh $SERWER 'tail -50 $ZDALNIE/logs/error.log'"
   exit 1
 fi

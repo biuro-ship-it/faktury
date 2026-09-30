@@ -8,7 +8,7 @@ const KAFLE = [
   { etykieta: 'Sprzedaż w tym miesiącu', faza: 2 },
   { etykieta: 'Należności przeterminowane', faza: 3 },
   { etykieta: 'Stan kasy', faza: 3 },
-  { etykieta: 'Wartość magazynu', faza: 4 },
+  { etykieta: 'Stan rachunku bankowego', faza: 3 },
 ]
 
 export function DashboardPage() {

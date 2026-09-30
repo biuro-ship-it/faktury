@@ -6,6 +6,7 @@ import {
   FileText,
   LayoutDashboard,
   type LucideIcon,
+  MessageSquareText,
   ReceiptText,
   Scale,
   ShoppingCart,
@@ -22,6 +23,7 @@ export type Modul = {
 }
 
 export const PULPIT = { sciezka: '/', nazwa: 'Pulpit', ikona: LayoutDashboard }
+export const UWAGI = { sciezka: '/uwagi', nazwa: 'Uwagi', ikona: MessageSquareText }
 
 // Kolejność i zakres wg PLAN.md (sekcje 1 i 6).
 export const MODULY: Modul[] = [

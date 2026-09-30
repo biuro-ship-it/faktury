@@ -1,8 +1,66 @@
-import { LogOut, Menu, X } from 'lucide-react'
+import { LogOut, Menu, MessageSquarePlus, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router'
 import { useAuth, useProfil } from '../auth/AuthProvider'
-import { MODULY, PULPIT } from './moduly'
+import { FormularzUwagi } from '../uwagi/FormularzUwagi'
+import { MODULY, PULPIT, UWAGI } from './moduly'
+
+/** Pływający przycisk na każdej stronie: uwaga zapisuje się z podpowiedzianym bieżącym modułem. */
+function SzybkaUwaga() {
+  const { pathname } = useLocation()
+  const [otwarte, setOtwarte] = useState(false)
+  const [zapisano, setZapisano] = useState(false)
+  const biezacyModul = MODULY.find((m) => pathname.startsWith(m.sciezka))?.sciezka ?? null
+
+  useEffect(() => {
+    if (!zapisano) return
+    const t = setTimeout(() => setZapisano(false), 2500)
+    return () => clearTimeout(t)
+  }, [zapisano])
+
+  if (pathname.startsWith(UWAGI.sciezka)) return null
+
+  return (
+    <>
+      {zapisano && (
+        <div role="status" className="fixed bottom-20 right-6 z-50 rounded-lg bg-marka-950 px-4 py-2 text-sm text-white shadow-lg">
+          Uwaga zapisana ✓
+        </div>
+      )}
+      <button
+        type="button"
+        onClick={() => setOtwarte(true)}
+        className="fixed bottom-6 right-6 z-40 inline-flex items-center gap-2 rounded-full bg-zloto-600 px-4 py-3 text-sm font-semibold text-marka-950 shadow-lg ring-1 ring-zloto-700/20 transition hover:bg-zloto-500 hover:shadow-xl"
+      >
+        <MessageSquarePlus className="size-5" />
+        <span className="hidden sm:inline">Zgłoś uwagę</span>
+      </button>
+      {otwarte && (
+        <div
+          className="fixed inset-0 z-50 grid place-items-center bg-marka-950/40 p-4"
+          onMouseDown={(e) => e.target === e.currentTarget && setOtwarte(false)}
+          onKeyDown={(e) => e.key === 'Escape' && setOtwarte(false)}
+        >
+          <div role="dialog" aria-modal="true" aria-labelledby="szybka-uwaga" className="w-full max-w-lg rounded-xl bg-powierzchnia p-6 shadow-2xl">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 id="szybka-uwaga" className="font-semibold text-marka-950">Zgłoś uwagę</h2>
+              <button type="button" onClick={() => setOtwarte(false)} className="rounded-md p-1 text-neutral-500 hover:bg-neutral-100" aria-label="Zamknij">
+                <X className="size-5" />
+              </button>
+            </div>
+            <FormularzUwagi
+              modulStartowy={biezacyModul}
+              onDodano={() => {
+                setOtwarte(false)
+                setZapisano(true)
+              }}
+            />
+          </div>
+        </div>
+      )}
+    </>
+  )
+}
 
 function LinkMenu({ sciezka, nazwa, ikona: Ikona }: { sciezka: string; nazwa: string; ikona: typeof PULPIT.ikona }) {
   return (
@@ -65,6 +123,10 @@ export function AppShell() {
           {MODULY.map((m) => (
             <LinkMenu key={m.sciezka} sciezka={m.sciezka} nazwa={m.nazwa} ikona={m.ikona} />
           ))}
+          <div className="px-3 pb-1.5 pt-5 text-[11px] font-semibold uppercase tracking-wider text-marka-400">
+            Rozwój
+          </div>
+          <LinkMenu {...UWAGI} />
         </nav>
 
         <div className="border-t border-white/10 p-3">
@@ -105,6 +167,7 @@ export function AppShell() {
         </div>
         <Outlet />
       </main>
+      <SzybkaUwaga />
     </div>
   )
 }

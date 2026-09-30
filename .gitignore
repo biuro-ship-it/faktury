@@ -1,0 +1,23 @@
+# Sekrety
+.env
+*.env.local
+secret/
+*service_account*.json
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Node / frontend
+node_modules/
+frontend/dist/
+
+# Edytory / system
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store
+backend/static/
+secret/

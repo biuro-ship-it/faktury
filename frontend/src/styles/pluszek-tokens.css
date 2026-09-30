@@ -1,0 +1,72 @@
+/*
+ * Paleta Pluszek „Butelkowa Zieleń” (zatwierdzona 11.06.2026).
+ * TYMCZASOWA rekonstrukcja z parametrów palety — docelowo plik zostanie podmieniony
+ * oryginalnym pluszek-tokens.css. Nazwy zmiennych (--pl-*) to kontrakt: index.css
+ * mapuje je na klasy Tailwinda, komponenty nie używają surowych kolorów.
+ *
+ * Kotwice: zieleń marki 900 = #14532D, tło 50 = #F0FDF4, tekst 950 = #052E16,
+ * złoto 600 = #CA8A04, sukces = #16A34A (celowo spoza skali marki).
+ */
+
+:root {
+  /* Zieleń butelkowa — stonowana, lekko w stronę błękitu, żeby żaden stopień
+     nie pokrywał się z jaskrawą zielenią „sukcesu”. */
+  --pl-zielen-50: #f0fdf4;
+  --pl-zielen-100: #daf3e4;
+  --pl-zielen-200: #b8e4cb;
+  --pl-zielen-300: #85cba3;
+  --pl-zielen-400: #4fa877;
+  --pl-zielen-500: #2e8b57;
+  --pl-zielen-600: #267a4c;
+  --pl-zielen-700: #1f6b42;
+  --pl-zielen-800: #196038;
+  --pl-zielen-900: #14532d;
+  --pl-zielen-950: #052e16;
+
+  /* Złoto — akcent, ok. 10% powierzchni: aktywny element, wyróżnienie, nie tła. */
+  --pl-zloto-50: #fefce8;
+  --pl-zloto-100: #fef9c3;
+  --pl-zloto-200: #fef08a;
+  --pl-zloto-300: #fde047;
+  --pl-zloto-400: #facc15;
+  --pl-zloto-500: #eab308;
+  --pl-zloto-600: #ca8a04;
+  --pl-zloto-700: #a16207;
+  --pl-zloto-800: #854d0e;
+  --pl-zloto-900: #713f12;
+  --pl-zloto-950: #422006;
+
+  /* Neutralne — ciepłe szarości (odcień kamienia), nie zimne niebieskawe. */
+  --pl-neutral-50: #fafaf9;
+  --pl-neutral-100: #f5f5f4;
+  --pl-neutral-200: #e7e5e4;
+  --pl-neutral-300: #d6d3d1;
+  --pl-neutral-400: #a8a29e;
+  --pl-neutral-500: #78716c;
+  --pl-neutral-600: #57534e;
+  --pl-neutral-700: #44403c;
+  --pl-neutral-800: #292524;
+  --pl-neutral-900: #1c1917;
+  --pl-neutral-950: #0c0a09;
+
+  /* Role semantyczne */
+  --pl-marka: var(--pl-zielen-900);
+  --pl-marka-hover: var(--pl-zielen-800);
+  --pl-akcent: var(--pl-zloto-600);
+  --pl-tlo: var(--pl-zielen-50);
+  --pl-powierzchnia: #ffffff;
+  --pl-tekst: var(--pl-zielen-950);
+  --pl-tekst-drugorzedny: var(--pl-neutral-600);
+  --pl-obramowanie: var(--pl-neutral-200);
+
+  /* Komunikaty — sukces celowo inny niż zieleń marki; ostrzeżenie pomarańczowe,
+     żeby nie mylić go ze złotym akcentem. */
+  --pl-sukces: #16a34a;
+  --pl-sukces-tlo: #dcfce7;
+  --pl-ostrzezenie: #c2410c;
+  --pl-ostrzezenie-tlo: #ffedd5;
+  --pl-blad: #dc2626;
+  --pl-blad-tlo: #fee2e2;
+  --pl-info: #2563eb;
+  --pl-info-tlo: #dbeafe;
+}

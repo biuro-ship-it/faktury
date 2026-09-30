@@ -1,0 +1,61 @@
+name: Testy
+
+# Bramka jakości: testy backendu na prawdziwym PostgreSQL 16 + build frontu (z typecheckiem).
+# Przyszły deploy na staging/produkcję będzie czekał na powodzenie tego workflow.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: ksiegowosc
+          POSTGRES_PASSWORD: ksiegowosc
+          POSTGRES_DB: ksiegowosc_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U ksiegowosc"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      ENVIRONMENT: development
+      # DATABASE_URL tylko po to, żeby konfiguracja wstała — testy używają wyłącznie DATABASE_URL_TEST.
+      DATABASE_URL: postgresql+psycopg://ksiegowosc:ksiegowosc@localhost:5432/ksiegowosc_test
+      DATABASE_URL_TEST: postgresql+psycopg://ksiegowosc:ksiegowosc@localhost:5432/ksiegowosc_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: backend/requirements*.txt
+      - run: pip install -r requirements-dev.txt
+      - name: Migracje zgodne z modelami
+        run: python -m alembic upgrade head && python -m alembic check
+      - name: Testy (w tym niezmiennik)
+        run: python -m pytest
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      # `npm run build` robi też `tsc -b`, więc to jednocześnie typecheck.
+      - run: npm run build

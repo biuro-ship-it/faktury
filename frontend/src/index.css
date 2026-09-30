@@ -1,0 +1,80 @@
+@import '@fontsource-variable/inter';
+@import 'tailwindcss';
+@import './styles/pluszek-tokens.css';
+
+/*
+ * Konfiguracja Tailwinda (v4 trzyma ją w CSS, nie w tailwind.config.js).
+ * Klasy: bg-marka-900, text-zloto-600, border-neutral-200, bg-sukces-tlo …
+ * `inline` — klasy wskazują bezpośrednio na zmienne --pl-*, więc podmiana
+ * pluszek-tokens.css zmienia cały wygląd bez przebudowy konfiguracji.
+ */
+@theme inline {
+  --font-sans: 'Inter Variable', ui-sans-serif, system-ui, sans-serif;
+
+  --color-marka-50: var(--pl-zielen-50);
+  --color-marka-100: var(--pl-zielen-100);
+  --color-marka-200: var(--pl-zielen-200);
+  --color-marka-300: var(--pl-zielen-300);
+  --color-marka-400: var(--pl-zielen-400);
+  --color-marka-500: var(--pl-zielen-500);
+  --color-marka-600: var(--pl-zielen-600);
+  --color-marka-700: var(--pl-zielen-700);
+  --color-marka-800: var(--pl-zielen-800);
+  --color-marka-900: var(--pl-zielen-900);
+  --color-marka-950: var(--pl-zielen-950);
+
+  --color-zloto-50: var(--pl-zloto-50);
+  --color-zloto-100: var(--pl-zloto-100);
+  --color-zloto-200: var(--pl-zloto-200);
+  --color-zloto-300: var(--pl-zloto-300);
+  --color-zloto-400: var(--pl-zloto-400);
+  --color-zloto-500: var(--pl-zloto-500);
+  --color-zloto-600: var(--pl-zloto-600);
+  --color-zloto-700: var(--pl-zloto-700);
+  --color-zloto-800: var(--pl-zloto-800);
+  --color-zloto-900: var(--pl-zloto-900);
+  --color-zloto-950: var(--pl-zloto-950);
+
+  --color-neutral-50: var(--pl-neutral-50);
+  --color-neutral-100: var(--pl-neutral-100);
+  --color-neutral-200: var(--pl-neutral-200);
+  --color-neutral-300: var(--pl-neutral-300);
+  --color-neutral-400: var(--pl-neutral-400);
+  --color-neutral-500: var(--pl-neutral-500);
+  --color-neutral-600: var(--pl-neutral-600);
+  --color-neutral-700: var(--pl-neutral-700);
+  --color-neutral-800: var(--pl-neutral-800);
+  --color-neutral-900: var(--pl-neutral-900);
+  --color-neutral-950: var(--pl-neutral-950);
+
+  --color-tlo: var(--pl-tlo);
+  --color-powierzchnia: var(--pl-powierzchnia);
+  --color-tekst: var(--pl-tekst);
+  --color-tekst-drugorzedny: var(--pl-tekst-drugorzedny);
+  --color-obramowanie: var(--pl-obramowanie);
+  --color-sukces: var(--pl-sukces);
+  --color-sukces-tlo: var(--pl-sukces-tlo);
+  --color-ostrzezenie: var(--pl-ostrzezenie);
+  --color-ostrzezenie-tlo: var(--pl-ostrzezenie-tlo);
+  --color-blad: var(--pl-blad);
+  --color-blad-tlo: var(--pl-blad-tlo);
+  --color-info: var(--pl-info);
+  --color-info-tlo: var(--pl-info-tlo);
+}
+
+@layer base {
+  html {
+    font-feature-settings: 'cv11', 'ss01';
+  }
+  body {
+    @apply bg-tlo text-tekst font-sans antialiased;
+  }
+  /* Kwoty i numery dokumentów zawsze równymi kolumnami cyfr. */
+  table,
+  .liczby {
+    font-variant-numeric: tabular-nums;
+  }
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-zloto-600;
+  }
+}

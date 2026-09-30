@@ -1,0 +1,17 @@
+# Zależności produkcyjne. Wersje przypięte — aktualizujemy świadomie, nie przy okazji.
+fastapi==0.142.1
+uvicorn==0.54.0
+SQLAlchemy==2.1.1
+alembic==1.20.0
+# mydevil (FreeBSD) nie ma gotowych kół psycopg-binary — tam czysty psycopg korzysta z systemowego libpq.
+psycopg[binary]==3.3.6 ; platform_system != "FreeBSD"
+psycopg==3.3.6 ; platform_system == "FreeBSD"
+pydantic==2.13.5
+pydantic-settings==2.15.0
+# Weryfikacja tokenów Firebase bez klucza konta serwisowego (tylko publiczne certyfikaty Google).
+google-auth==2.59.0
+requests==2.34.2
+# Passenger (mydevil) mówi WSGI, FastAPI jest ASGI — a2wsgi to tłumaczy.
+a2wsgi==1.10.10
+# Lokalnie AVG przechwytuje HTTPS; truststore każe Pythonowi ufać magazynowi certyfikatów Windows.
+truststore==0.10.4 ; platform_system == "Windows"

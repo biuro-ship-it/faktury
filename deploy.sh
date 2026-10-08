@@ -10,6 +10,11 @@ DOMENA="faktury.pluszek.pl"
 ZDALNIE="domains/$DOMENA"
 KATALOG="$(cd "$(dirname "$0")" && pwd)"
 
+# Windows Smart App Control blokuje DLL z psycopg_binary — psycopg używa wtedy podpisanej libpq.dll
+# z instalacji PostgreSQL 16 (DECISIONS 2026-10-08, środowisko lokalne). Na innych komputerach bez zmian.
+PG_BIN="/c/Program Files/PostgreSQL/16/bin"
+[ -d "$PG_BIN" ] && export PATH="$PG_BIN:$PATH"
+
 echo "==> 1/6 Testy backendu (niezmiennik musi być zielony przed wdrożeniem)"
 (cd "$KATALOG/backend" && .venv/Scripts/python -m pytest -q)
 

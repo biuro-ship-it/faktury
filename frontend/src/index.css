@@ -78,3 +78,20 @@
     @apply outline-2 outline-offset-2 outline-zloto-600;
   }
 }
+
+/* Panel boczny (kartoteki): wsuwa się z prawej, tło łagodnie ciemnieje. */
+@theme inline {
+  --animate-wsuw: wsuw 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  --animate-rozjasnij: rozjasnij 0.2s ease-out;
+}
+@keyframes wsuw {
+  from { transform: translateX(2rem); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+@keyframes rozjasnij {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: 0.01ms !important; }
+}

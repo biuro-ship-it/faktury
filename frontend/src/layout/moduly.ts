@@ -24,6 +24,7 @@ export type Modul = {
 }
 
 export const PULPIT = { sciezka: '/', nazwa: 'Pulpit', ikona: LayoutDashboard }
+export const KARTOTEKI = { sciezka: '/kartoteki' }
 export const UWAGI = { sciezka: '/uwagi', nazwa: 'Uwagi', ikona: MessageSquareText }
 export const USTAWIENIA = { sciezka: '/ustawienia', nazwa: 'Ustawienia', ikona: Settings }
 
@@ -32,6 +33,7 @@ export const MODULY: Modul[] = [
   {
     sciezka: '/kartoteki', nazwa: 'Kartoteki', ikona: BookUser, faza: 1,
     opis: 'Kontrahenci, towary, magazyny i receptury — dane, na których opierają się dokumenty.',
+    // Gotowe: kontrahenci, towary/surowce/wyroby/usługi, pracownicy. Zostają: magazyny, kategorie kosztów, receptury, import CSV.
     zakres: ['Kontrahenci z danymi z Białej Listy MF (po NIP)', 'Towary, surowce, wyroby i usługi', 'Magazyny i kategorie kosztów', 'Receptury wyrobów', 'Import CSV'],
   },
   {

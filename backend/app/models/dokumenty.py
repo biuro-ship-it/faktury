@@ -1,4 +1,4 @@
-"""Dokumenty handlowe: faktury sprzedaży (a docelowo także korekty, proformy, faktury zakupu i kosztowe).
+"""Dokumenty handlowe: faktury sprzedaży i zakupu (a docelowo także korekty, proformy i faktury kosztowe).
 
 Jedna tabela `dokument` dla wszystkich faktur — PLAN.md, sekcja 5. Niezmiennik (PLAN, sekcja 3):
 - zatwierdzonego dokumentu nie wolno zmienić ani usunąć; jedyna zmiana to anulowanie (numer zostaje zajęty).
@@ -7,6 +7,12 @@ Jedna tabela `dokument` dla wszystkich faktur — PLAN.md, sekcja 5. Niezmiennik
 - dokument przechowuje KOPIĘ danych nabywcy, sprzedawcy i pozycji — późniejsza zmiana kartotek czy
   ustawień firmy nie rusza wystawionych faktur;
 - kwoty w groszach (BIGINT), ilości NUMERIC(14,4).
+
+Faktura ZAKUPU używa tych samych kolumn „na odwrót” (nazwy zostały z faktury sprzedaży, żeby nie ruszać
+wdrożonej migracji 0005): kolumny `nabywca_*` przechowują KOPIĘ DANYCH DOSTAWCY (kontrahenta), a JSONB
+`sprzedawca` — kopię danych WŁASNEJ firmy (nabywcy tej faktury). Warstwa API (app/api/zakupy.py) pokazuje je
+pod właściwymi nazwami (`dostawca_*`, `nabywca`). `numer` to numer nadany w aplikacji (własna seria),
+`numer_obcy` — numer faktury dostawcy.
 """
 
 from datetime import date, datetime
@@ -58,6 +64,16 @@ class Dokument(Baza):
         # Numer jest unikalny w obrębie typu dokumentu (dwie serie nie mogą wyprodukować tego samego numeru).
         Index("uq_dokument_typ_numer", "typ", "numer", unique=True, postgresql_where=text("numer IS NOT NULL")),
         Index("ix_dokument_typ_data", "typ", "data_wystawienia"),
+        # Faktura zakupu zatwierdzona musi mieć numer dostawcy (migracja 0006).
+        CheckConstraint(
+            "typ <> 'faktura_zakupu' OR status = 'szkic' OR length(btrim(numer_obcy)) > 0", name="zakup_numer_obcy"
+        ),
+        # Ten sam numer faktury dostawcy nie może trafić do ewidencji dwa razy (podwójne naliczenie VAT).
+        # Anulowana faktura zwalnia numer — można wprowadzić ją poprawnie od nowa.
+        Index(
+            "uq_dokument_zakupu_numer_obcy", "kontrahent_id", "numer_obcy", unique=True,
+            postgresql_where=text("typ = 'faktura_zakupu' AND status <> 'anulowany' AND numer_obcy <> ''"),
+        ),
     )
 
     id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)

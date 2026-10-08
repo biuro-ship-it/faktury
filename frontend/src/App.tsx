@@ -2,7 +2,7 @@ import { LoaderCircle } from 'lucide-react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router'
 import { useAuth } from './auth/AuthProvider'
 import { AppShell } from './layout/AppShell'
-import { KARTOTEKI, MODULY, SPRZEDAZ, USTAWIENIA, UWAGI } from './layout/moduly'
+import { KARTOTEKI, MODULY, SPRZEDAZ, USTAWIENIA, UWAGI, ZAKUPY } from './layout/moduly'
 import { DashboardPage } from './pages/DashboardPage'
 import { KartotekiPage } from './pages/KartotekiPage'
 import { LoginPage } from './pages/LoginPage'
@@ -10,6 +10,7 @@ import { ModulPage } from './pages/ModulPage'
 import { SprzedazPage } from './pages/SprzedazPage'
 import { UstawieniaPage } from './pages/UstawieniaPage'
 import { UwagiPage } from './pages/UwagiPage'
+import { ZakupyPage } from './pages/ZakupyPage'
 
 export function App() {
   const { stan } = useAuth()
@@ -30,7 +31,8 @@ export function App() {
           <Route index element={<DashboardPage />} />
           <Route path={`${KARTOTEKI.sciezka}/*`} element={<KartotekiPage />} />
           <Route path={`${SPRZEDAZ.sciezka}/*`} element={<SprzedazPage />} />
-          {MODULY.filter((m) => m.sciezka !== KARTOTEKI.sciezka && m.sciezka !== SPRZEDAZ.sciezka).map((m) => (
+          <Route path={`${ZAKUPY.sciezka}/*`} element={<ZakupyPage />} />
+          {MODULY.filter((m) => ![KARTOTEKI.sciezka, SPRZEDAZ.sciezka, ZAKUPY.sciezka].includes(m.sciezka)).map((m) => (
             <Route key={m.sciezka} path={`${m.sciezka}/*`} element={<ModulPage modul={m} />} />
           ))}
           <Route path={UWAGI.sciezka} element={<UwagiPage />} />

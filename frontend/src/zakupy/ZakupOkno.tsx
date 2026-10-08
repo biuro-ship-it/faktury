@@ -2,35 +2,32 @@ import { AlertTriangle, Ban, CheckCircle2, FileCheck2, LoaderCircle, Plus, Trash
 import { type FormEvent, useEffect, useMemo, useRef, useState } from 'react'
 import { naGrosze, naZlote, type Kontrahent, type Lista, type Towar } from '../kartoteki/api'
 import { api } from '../lib/api'
+import { dodajDni, dzisISO, naDate, naIlosc, normalizujIlosc, STATUSY, vatOdNetto, wartoscPozycji } from '../sprzedaz/api'
+import { Dana, Podsumowanie, Strona, TON_STATUSU } from '../sprzedaz/FakturaOkno'
 import { Komunikat, Pole, PoleTekstowe, Przycisk, Wejscie, Wybor } from '../ui/formularz'
 import { Panel, Plakietka, SekcjaFormularza } from '../ui/kartoteka'
 import { Podpowiedzi } from '../ui/Podpowiedzi'
-import { FORMY_PLATNOSCI, type FormaPlatnosci, useFirma, useKonta, useSerie, useStawki } from '../ustawienia/api'
-import {
-  dodajDni, dzisISO, type Faktura, type FakturaDane, naDate, naIban, naIlosc, normalizujIlosc, STATUSY, useAnulujFakture, useFaktura,
-  useUsunSzkic, useZapiszFakture, useZatwierdzFakture, vatOdNetto, wartoscPozycji,
-} from './api'
+import { FORMY_PLATNOSCI, type FormaPlatnosci, useFirma, useSerie, useStawki } from '../ustawienia/api'
+import { type Zakup, type ZakupDane, useAnulujZakup, useUsunSzkicZakupu, useZakup, useZapiszZakup, useZatwierdzZakup } from './api'
 
-export const TON_STATUSU = { szkic: 'zloty', zatwierdzony: 'zielony', anulowany: 'szary' } as const
-
-/** Okno faktury: szkic otwiera się w edytorze, zatwierdzona i anulowana — w podglądzie (tylko do odczytu). */
-export function FakturaOkno({ id: poczatkoweId, onZamknij }: { id: number | null; onZamknij: () => void }) {
+/** Okno faktury zakupu: szkic otwiera się w edytorze, zatwierdzona i anulowana — w podglądzie (tylko do odczytu). */
+export function ZakupOkno({ id: poczatkoweId, onZamknij }: { id: number | null; onZamknij: () => void }) {
   const [id, setId] = useState(poczatkoweId)
-  const faktura = useFaktura(id)
+  const faktura = useZakup(id)
 
   if (id !== null && faktura.isPending) {
     return (
-      <Panel tytul="Faktura" onZamknij={onZamknij} szerokie>
+      <Panel tytul="Faktura zakupu" onZamknij={onZamknij} szerokie>
         <div className="grid place-items-center py-16"><LoaderCircle className="size-6 animate-spin text-marka-700" /></div>
       </Panel>
     )
   }
   if (faktura.isError) {
-    return <Panel tytul="Faktura" onZamknij={onZamknij}><Komunikat rodzaj="blad">{faktura.error.message}</Komunikat></Panel>
+    return <Panel tytul="Faktura zakupu" onZamknij={onZamknij}><Komunikat rodzaj="blad">{faktura.error.message}</Komunikat></Panel>
   }
-  if (faktura.data && faktura.data.status !== 'szkic') return <PodgladFaktury f={faktura.data} onZamknij={onZamknij} />
+  if (faktura.data && faktura.data.status !== 'szkic') return <PodgladZakupu f={faktura.data} onZamknij={onZamknij} />
   // Bez `key`: po pierwszym zapisie nowej faktury edytor zostaje ten sam (nie traci stanu), dostaje tylko id.
-  return <EdytorFaktury poczatkowa={faktura.data ?? null} onZapisano={setId} onZamknij={onZamknij} />
+  return <EdytorZakupu poczatkowa={faktura.data ?? null} onZapisano={setId} onZamknij={onZamknij} />
 }
 
 // ---------------------------------------------------------------- Edytor szkicu
@@ -38,6 +35,7 @@ export function FakturaOkno({ id: poczatkoweId, onZamknij }: { id: number | null
 type Wiersz = {
   klucz: number
   towar_id: number | null
+  symbol: string // tylko do wyświetlenia; przy wczytanym szkicu pusty
   nazwa: string
   jm: string
   ilosc: string
@@ -46,57 +44,57 @@ type Wiersz = {
   gtu: string | null
 }
 
-type NabywcaWidok = { id: number; nazwa: string; nip: string; adres: string; termin: number | null }
+type DostawcaWidok = { id: number; nazwa: string; nip: string; adres: string; termin: number | null }
 
 let licznikWierszy = 0
 const nowyWiersz = (stawka = ''): Wiersz => ({
-  klucz: ++licznikWierszy, towar_id: null, nazwa: '', jm: 'szt.', ilosc: '1', cena: '', stawka_vat_kod: stawka, gtu: null,
+  klucz: ++licznikWierszy, towar_id: null, symbol: '', nazwa: '', jm: 'szt.', ilosc: '1', cena: '', stawka_vat_kod: stawka, gtu: null,
 })
 
-const szukajKontrahentow = (q: string) =>
-  api<Lista<Kontrahent>>(`/api/kartoteki/kontrahenci?rola=odbiorcy&limit=8&q=${encodeURIComponent(q)}`).then((l) => l.pozycje)
+const szukajDostawcow = (q: string) =>
+  api<Lista<Kontrahent>>(`/api/kartoteki/kontrahenci?rola=dostawcy&limit=8&q=${encodeURIComponent(q)}`).then((l) => l.pozycje)
+// Faktura zakupu obejmuje towary handlowe i surowce (usługi — w module Koszty), więc szukamy obu typów.
 const szukajTowarow = (q: string) =>
-  api<Lista<Towar>>(`/api/kartoteki/towary?limit=8&q=${encodeURIComponent(q)}`).then((l) => l.pozycje.filter((t) => t.typ !== 'surowiec'))
+  Promise.all((['towar_handlowy', 'surowiec'] as const).map((typ) =>
+    api<Lista<Towar>>(`/api/kartoteki/towary?typ=${typ}&limit=8&q=${encodeURIComponent(q)}`).then((l) => l.pozycje),
+  )).then((listy) => listy.flat().sort((a, b) => a.symbol.localeCompare(b.symbol)).slice(0, 10))
 
 const adresKontrahenta = (k: { adres_ulica: string; kod_pocztowy: string; miejscowosc: string }) =>
   [k.adres_ulica, [k.kod_pocztowy, k.miejscowosc].filter(Boolean).join(' ')].filter(Boolean).join(', ')
 
-function EdytorFaktury({ poczatkowa, onZapisano, onZamknij }: {
-  poczatkowa: Faktura | null
+function EdytorZakupu({ poczatkowa, onZapisano, onZamknij }: {
+  poczatkowa: Zakup | null
   onZapisano: (id: number) => void
   onZamknij: () => void
 }) {
   const firma = useFirma()
   const serie = useSerie()
-  const konta = useKonta()
   const stawki = useStawki()
-  const zapisz = useZapiszFakture()
-  const zatwierdz = useZatwierdzFakture()
-  const usun = useUsunSzkic()
+  const zapisz = useZapiszZakup()
+  const zatwierdz = useZatwierdzZakup()
+  const usun = useUsunSzkicZakupu()
 
   const dzis = dzisISO()
   const [nagl, setNagl] = useState({
     seria_id: poczatkowa?.seria_id ?? null,
+    numer_obcy: poczatkowa?.numer_obcy ?? '',
     data_wystawienia: poczatkowa?.data_wystawienia ?? dzis,
-    data_sprzedazy: poczatkowa?.data_sprzedazy ?? dzis,
+    data_zakupu: poczatkowa?.data_zakupu ?? dzis,
     termin_platnosci: poczatkowa?.termin_platnosci ?? null,
     forma_platnosci: (poczatkowa?.forma_platnosci ?? 'przelew') as FormaPlatnosci,
-    konto_bankowe_id: poczatkowa?.konto_bankowe_id ?? null,
-    miejsce_wystawienia: poczatkowa?.miejsce_wystawienia ?? '',
-    wystawiajacy: poczatkowa?.wystawiajacy ?? '',
     uwagi: poczatkowa?.uwagi ?? '',
   })
-  const [nabywca, setNabywca] = useState<NabywcaWidok | null>(
+  const [dostawca, setDostawca] = useState<DostawcaWidok | null>(
     poczatkowa?.kontrahent_id
-      ? { id: poczatkowa.kontrahent_id, nazwa: poczatkowa.nabywca_nazwa, nip: poczatkowa.nabywca_nip,
-          adres: adresKontrahenta({ adres_ulica: poczatkowa.nabywca_adres_ulica, kod_pocztowy: poczatkowa.nabywca_kod_pocztowy, miejscowosc: poczatkowa.nabywca_miejscowosc }),
+      ? { id: poczatkowa.kontrahent_id, nazwa: poczatkowa.dostawca_nazwa, nip: poczatkowa.dostawca_nip,
+          adres: adresKontrahenta({ adres_ulica: poczatkowa.dostawca_adres_ulica, kod_pocztowy: poczatkowa.dostawca_kod_pocztowy, miejscowosc: poczatkowa.dostawca_miejscowosc }),
           termin: null }
       : null,
   )
-  const [szukanyNabywca, setSzukanyNabywca] = useState('')
+  const [szukanyDostawca, setSzukanyDostawca] = useState('')
   const [wiersze, setWiersze] = useState<Wiersz[]>(() =>
     poczatkowa?.pozycje.length
-      ? poczatkowa.pozycje.map((p) => ({ klucz: ++licznikWierszy, towar_id: p.towar_id, nazwa: p.nazwa, jm: p.jm,
+      ? poczatkowa.pozycje.map((p) => ({ klucz: ++licznikWierszy, towar_id: p.towar_id, symbol: '', nazwa: p.nazwa, jm: p.jm,
           ilosc: naIlosc(p.ilosc), cena: naZlote(p.cena_netto), stawka_vat_kod: p.stawka_vat_kod, gtu: p.gtu }))
       : [nowyWiersz()],
   )
@@ -106,8 +104,7 @@ function EdytorFaktury({ poczatkowa, onZapisano, onZamknij }: {
   const [potwierdzenie, setPotwierdzenie] = useState<'zatwierdz' | 'usun' | null>(null)
   const [braki, setBraki] = useState<string[]>(poczatkowa?.braki ?? [])
 
-  const seriaFaktur = (serie.data ?? []).filter((s) => s.typ_dokumentu === 'faktura_sprzedazy' && (s.aktywna || s.id === nagl.seria_id))
-  const aktywneKonta = (konta.data ?? []).filter((k) => k.aktywne || k.id === nagl.konto_bankowe_id)
+  const seriaZakupu = (serie.data ?? []).filter((s) => s.typ_dokumentu === 'faktura_zakupu' && (s.aktywna || s.id === nagl.seria_id))
   const uzyteStawki = new Set(poczatkowa?.pozycje.map((p) => p.stawka_vat_kod))
   const dostepneStawki = (stawki.data ?? []).filter((s) => s.aktywna || uzyteStawki.has(s.kod))
   const domyslnaStawka = stawki.data?.find((s) => s.domyslna)?.kod ?? ''
@@ -115,27 +112,18 @@ function EdytorFaktury({ poczatkowa, onZapisano, onZamknij }: {
   // Nowa faktura: domyślne wartości z Ustawień, gdy tylko się wczytają (raz).
   const wypelnione = useRef(poczatkowa !== null)
   useEffect(() => {
-    if (wypelnione.current || !firma.data || !serie.data || !konta.data || !stawki.data) return
+    if (wypelnione.current || !firma.data || !serie.data || !stawki.data) return
     wypelnione.current = true
-    const f = firma.data
-    setNagl((n) => ({
-      ...n,
-      seria_id: seriaFaktur.find((s) => s.aktywna)?.id ?? null,
-      forma_platnosci: f.forma_platnosci,
-      miejsce_wystawienia: f.miejsce_wystawienia,
-      wystawiajacy: f.wystawiajacy,
-      uwagi: f.uwagi_na_fakturze,
-      konto_bankowe_id: konta.data.find((k) => k.domyslne && k.aktywne && k.waluta === 'PLN')?.id ?? null,
-    }))
+    setNagl((n) => ({ ...n, seria_id: seriaZakupu.find((s) => s.aktywna)?.id ?? null, forma_platnosci: firma.data.forma_platnosci }))
     setWiersze((w) => w.map((x) => (x.stawka_vat_kod ? x : { ...x, stawka_vat_kod: domyslnaStawka })))
-  }, [firma.data, serie.data, konta.data, stawki.data]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [firma.data, serie.data, stawki.data]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Termin płatności: gotówka/karta — dzień wystawienia; przelew — termin kontrahenta albo domyślny z Ustawień.
+  // Termin płatności: gotówka/karta — dzień wystawienia; przelew — termin dostawcy albo domyślny z Ustawień.
   useEffect(() => {
     if (terminReczny) return
-    const dni = nagl.forma_platnosci === 'przelew' ? (nabywca?.termin ?? firma.data?.termin_platnosci_dni ?? 14) : 0
+    const dni = nagl.forma_platnosci === 'przelew' ? (dostawca?.termin ?? firma.data?.termin_platnosci_dni ?? 14) : 0
     setNagl((n) => ({ ...n, termin_platnosci: dodajDni(n.data_wystawienia, dni) }))
-  }, [terminReczny, nagl.forma_platnosci, nagl.data_wystawienia, nabywca, firma.data])
+  }, [terminReczny, nagl.forma_platnosci, nagl.data_wystawienia, dostawca, firma.data])
 
   const ustaw = <K extends keyof typeof nagl>(pole: K, w: (typeof nagl)[K]) => setNagl((n) => ({ ...n, [pole]: w }))
   const ustawWiersz = (klucz: number, zmiana: Partial<Wiersz>) =>
@@ -161,29 +149,29 @@ function EdytorFaktury({ poczatkowa, onZapisano, onZamknij }: {
     return { wartosci, wgStawek, netto: sumaNetto, vat: sumaVat, brutto: sumaNetto + sumaVat }
   }, [wiersze, stawki.data])
 
-  const zbudujDane = (): FakturaDane | string => {
-    const pozycje: FakturaDane['pozycje'] = []
+  const zbudujDane = (): ZakupDane | string => {
+    const pozycje: ZakupDane['pozycje'] = []
     for (const [i, w] of wiersze.entries()) {
-      if (!w.nazwa.trim() && !w.cena.trim()) continue // pusty wiersz pomijamy
+      if (w.towar_id === null && !w.nazwa.trim() && !w.cena.trim()) continue // pusty wiersz pomijamy
       const nr = i + 1
       const ilosc = normalizujIlosc(w.ilosc)
       const cena = naGrosze(w.cena)
-      if (!w.nazwa.trim()) return `Pozycja ${nr}: podaj nazwę`
+      if (w.towar_id === null) return `Pozycja ${nr}: wybierz towar lub surowiec z listy podpowiedzi (nowy dodasz w Kartotekach)`
       if (ilosc === undefined) return `Pozycja ${nr}: ilość musi być dodatnia, najwyżej 4 miejsca po przecinku`
-      if (typeof cena !== 'number') return `Pozycja ${nr}: wpisz cenę netto, np. 12,50`
+      if (typeof cena !== 'number') return `Pozycja ${nr}: wpisz cenę netto z faktury dostawcy, np. 12,50`
       if (!w.stawka_vat_kod) return `Pozycja ${nr}: wybierz stawkę VAT`
       pozycje.push({ towar_id: w.towar_id, nazwa: w.nazwa.trim(), jm: w.jm.trim() || 'szt.', ilosc, cena_netto: cena, stawka_vat_kod: w.stawka_vat_kod, gtu: w.gtu })
     }
-    return { ...nagl, kontrahent_id: nabywca?.id ?? null, pozycje }
+    return { ...nagl, numer_obcy: nagl.numer_obcy.trim(), kontrahent_id: dostawca?.id ?? null, pozycje }
   }
 
-  const zapiszSzkic = (potem?: (f: Faktura) => void) => {
+  const zapiszSzkic = (potem?: (f: Zakup) => void) => {
     const dane = zbudujDane()
     if (typeof dane === 'string') return setBlad(dane)
     setBlad(null)
     zapisz.mutate({ id: poczatkowa?.id ?? null, dane }, {
       onSuccess: (f) => { setBraki(f.braki); if (potem) potem(f); else onZamknij() },
-      onError: (e) => setBlad(e.message),
+      onError: (e) => { setPotwierdzenie(null); setBlad(e.message) },
     })
   }
   const naWyslanie = (e: FormEvent) => { e.preventDefault(); zapiszSzkic() }
@@ -196,14 +184,13 @@ function EdytorFaktury({ poczatkowa, onZapisano, onZamknij }: {
 
   const zajety = zapisz.isPending || zatwierdz.isPending || usun.isPending
   const nowy = poczatkowa === null
-  const tytulOkna = nowy ? 'Nowa faktura VAT' : 'Szkic faktury'
 
   return (
     <Panel
       szerokie
-      tytul={tytulOkna}
+      tytul={nowy ? 'Nowa faktura zakupu' : 'Szkic faktury zakupu'}
       naglowekDodatek={<Plakietka ton="zloty">Szkic</Plakietka>}
-      opis="Numer zostanie nadany przy zatwierdzeniu. Szkic można dowolnie zmieniać."
+      opis="Przepisz dane z faktury dostawcy. Własny numer zostanie nadany przy zatwierdzeniu. Szkic można dowolnie zmieniać."
       onZamknij={onZamknij}
       blad={blad}
       stopka={
@@ -224,14 +211,14 @@ function EdytorFaktury({ poczatkowa, onZapisano, onZamknij }: {
         ) : (
           <>
             <Przycisk onClick={() => setPotwierdzenie('zatwierdz')} disabled={zajety}><CheckCircle2 className="size-4" /> Zatwierdź</Przycisk>
-            <Przycisk type="submit" form="formularz-faktury" wariant="drugorzedny" laduje={zapisz.isPending}>Zapisz szkic</Przycisk>
+            <Przycisk type="submit" form="formularz-zakupu" wariant="drugorzedny" laduje={zapisz.isPending}>Zapisz szkic</Przycisk>
             <Przycisk wariant="cichy" onClick={onZamknij}>Zamknij</Przycisk>
             {!nowy && <Przycisk wariant="cichy" className="ml-auto !text-blad" onClick={() => setPotwierdzenie('usun')}><Trash2 className="size-4" /> Usuń szkic</Przycisk>}
           </>
         )
       }
     >
-      <form id="formularz-faktury" onSubmit={naWyslanie}>
+      <form id="formularz-zakupu" onSubmit={naWyslanie}>
         {braki.length > 0 && !nowy && (
           <div className="mb-5 rounded-lg border border-ostrzezenie/20 bg-ostrzezenie-tlo px-4 py-3 text-sm text-ostrzezenie">
             <p className="flex items-center gap-2 font-medium"><AlertTriangle className="size-4" /> Przed zatwierdzeniem:</p>
@@ -239,21 +226,21 @@ function EdytorFaktury({ poczatkowa, onZapisano, onZamknij }: {
           </div>
         )}
 
-        <SekcjaFormularza tytul="Nabywca">
+        <SekcjaFormularza tytul="Dostawca">
           <div className="sm:col-span-6">
-            {nabywca ? (
+            {dostawca ? (
               <div className="flex items-start justify-between gap-3 rounded-lg border border-marka-200 bg-marka-50/50 px-4 py-3">
                 <div className="min-w-0 text-sm">
-                  <p className="font-semibold text-marka-950">{nabywca.nazwa}</p>
-                  <p className="text-tekst-drugorzedny">{[nabywca.nip && `NIP ${nabywca.nip}`, nabywca.adres].filter(Boolean).join(' · ') || '—'}</p>
+                  <p className="font-semibold text-marka-950">{dostawca.nazwa}</p>
+                  <p className="text-tekst-drugorzedny">{[dostawca.nip && `NIP ${dostawca.nip}`, dostawca.adres].filter(Boolean).join(' · ') || '—'}</p>
                 </div>
-                <Przycisk wariant="cichy" className="!px-2" aria-label="Zmień nabywcę" onClick={() => { setNabywca(null); setSzukanyNabywca('') }}><X className="size-4" /></Przycisk>
+                <Przycisk wariant="cichy" className="!px-2" aria-label="Zmień dostawcę" onClick={() => { setDostawca(null); setSzukanyDostawca('') }}><X className="size-4" /></Przycisk>
               </div>
             ) : (
               <Podpowiedzi<Kontrahent>
-                klucz="odbiorcy" etykieta="Szukaj nabywcy" placeholder="Zacznij pisać nazwę, NIP albo miejscowość odbiorcy…"
-                wartosc={szukanyNabywca} onZmiana={setSzukanyNabywca} szukaj={szukajKontrahentow}
-                onWybierz={(k) => setNabywca({ id: k.id, nazwa: k.nazwa, nip: k.nip, adres: adresKontrahenta(k), termin: k.termin_platnosci_dni })}
+                klucz="dostawcy" etykieta="Szukaj dostawcy" placeholder="Zacznij pisać nazwę, NIP albo miejscowość dostawcy…"
+                wartosc={szukanyDostawca} onZmiana={setSzukanyDostawca} szukaj={szukajDostawcow}
+                onWybierz={(k) => setDostawca({ id: k.id, nazwa: k.nazwa, nip: k.nip, adres: adresKontrahenta(k), termin: k.termin_platnosci_dni })}
                 pokaz={(k) => (
                   <span className="flex flex-col">
                     <span className="font-medium">{k.nazwa}{!k.aktywny && <span className="ml-2 text-xs text-neutral-400">(wyłączony)</span>}</span>
@@ -262,21 +249,25 @@ function EdytorFaktury({ poczatkowa, onZapisano, onZamknij }: {
                 )}
               />
             )}
+            {!dostawca && <p className="mt-1.5 text-xs text-neutral-500">Na liście są kontrahenci oznaczeni w Kartotekach jako dostawcy.</p>}
           </div>
         </SekcjaFormularza>
 
         <SekcjaFormularza tytul="Dokument">
-          <Pole etykieta="Seria numeracji" className="sm:col-span-2" podpowiedz={seriaFaktur.length === 0 ? 'Dodaj serię w Ustawieniach → Faktury' : undefined}>
+          <Pole etykieta="Numer faktury dostawcy" className="sm:col-span-3" podpowiedz="Dokładnie jak na fakturze — pilnujemy, żeby nie wprowadzić jej dwa razy">
+            <Wejscie required maxLength={60} value={nagl.numer_obcy} onChange={(e) => ustaw('numer_obcy', e.target.value)} className="liczby" />
+          </Pole>
+          <Pole etykieta="Seria numeracji" className="sm:col-span-3" podpowiedz={seriaZakupu.length === 0 ? 'Dodaj serię „Faktura zakupu” w Ustawieniach → Faktury' : 'Własny numer w ewidencji'}>
             <Wybor value={nagl.seria_id ?? ''} onChange={(e) => ustaw('seria_id', e.target.value ? Number(e.target.value) : null)}>
               <option value="">— wybierz —</option>
-              {seriaFaktur.map((s) => <option key={s.id} value={s.id}>{s.nazwa} ({s.przyklad})</option>)}
+              {seriaZakupu.map((s) => <option key={s.id} value={s.id}>{s.nazwa} ({s.przyklad})</option>)}
             </Wybor>
           </Pole>
-          <Pole etykieta="Data wystawienia" className="sm:col-span-2">
+          <Pole etykieta="Data wystawienia" className="sm:col-span-3" podpowiedz="Z faktury dostawcy">
             <Wejscie type="date" required value={nagl.data_wystawienia} onChange={(e) => ustaw('data_wystawienia', e.target.value)} />
           </Pole>
-          <Pole etykieta="Data sprzedaży" className="sm:col-span-2" podpowiedz="Dostawy towaru / wykonania usługi">
-            <Wejscie type="date" required value={nagl.data_sprzedazy} onChange={(e) => ustaw('data_sprzedazy', e.target.value)} />
+          <Pole etykieta="Data zakupu" className="sm:col-span-3" podpowiedz="Dostawy towaru / wykonania usługi">
+            <Wejscie type="date" required value={nagl.data_zakupu} onChange={(e) => ustaw('data_zakupu', e.target.value)} />
           </Pole>
         </SekcjaFormularza>
 
@@ -287,7 +278,7 @@ function EdytorFaktury({ poczatkowa, onZapisano, onZamknij }: {
               <thead>
                 <tr className="border-b border-obramowanie bg-neutral-50/70 text-left text-xs uppercase tracking-wider text-neutral-500">
                   <th className="w-8 py-2 pl-3 font-medium">Lp</th>
-                  <th className="px-2 py-2 font-medium">Nazwa towaru lub usługi</th>
+                  <th className="px-2 py-2 font-medium">Towar lub surowiec z kartoteki</th>
                   <th className="w-24 px-2 py-2 text-right font-medium">Ilość</th>
                   <th className="w-20 px-2 py-2 font-medium">J.m.</th>
                   <th className="w-28 px-2 py-2 text-right font-medium">Cena netto</th>
@@ -303,22 +294,31 @@ function EdytorFaktury({ poczatkowa, onZapisano, onZamknij }: {
                     <tr key={w.klucz} className="align-top">
                       <td className="liczby py-3.5 pl-3 text-neutral-500">{i + 1}</td>
                       <td className="px-2 py-2">
-                        <Podpowiedzi<Towar>
-                          klucz="towary" etykieta={`Nazwa pozycji ${i + 1}`} placeholder="Nazwa albo symbol z kartoteki…"
-                          wartosc={w.nazwa} onZmiana={(t) => ustawWiersz(w.klucz, { nazwa: t, towar_id: null })} szukaj={szukajTowarow}
-                          onWybierz={(t) => ustawWiersz(w.klucz, {
-                            towar_id: t.id, nazwa: t.nazwa, jm: t.jm, gtu: t.gtu,
-                            stawka_vat_kod: dostepneStawki.some((s) => s.kod === t.stawka_vat_kod) ? t.stawka_vat_kod : domyslnaStawka,
-                            cena: t.cena_sprzedazy_netto === null ? w.cena : naZlote(t.cena_sprzedazy_netto),
-                          })}
-                          pokaz={(t) => (
-                            <span className="flex items-center justify-between gap-3">
-                              <span className="min-w-0"><span className="mr-2 font-mono text-xs text-neutral-500">{t.symbol}</span>{t.nazwa}</span>
-                              {t.cena_sprzedazy_netto !== null && <span className="liczby shrink-0 text-xs text-neutral-500">{naZlote(t.cena_sprzedazy_netto)} zł</span>}
+                        {w.towar_id !== null ? (
+                          <div className="flex items-start justify-between gap-2 rounded-lg border border-marka-200 bg-marka-50/50 px-3 py-2">
+                            <span className="min-w-0">
+                              {w.symbol && <span className="mr-2 font-mono text-xs text-neutral-500">{w.symbol}</span>}
+                              <span className="font-medium text-marka-950">{w.nazwa}</span>
                             </span>
-                          )}
-                        />
-                        {w.towar_id !== null && <span className="mt-1 block text-xs text-marka-700">z kartoteki</span>}
+                            <button type="button" aria-label={`Zmień towar, pozycja ${i + 1}`} className="rounded p-0.5 text-neutral-400 transition hover:text-marka-900"
+                              onClick={() => ustawWiersz(w.klucz, { towar_id: null, symbol: '', nazwa: '' })}><X className="size-4" /></button>
+                          </div>
+                        ) : (
+                          <Podpowiedzi<Towar>
+                            klucz="towary-zakupu" etykieta={`Towar, pozycja ${i + 1}`} placeholder="Nazwa albo symbol towaru lub surowca…"
+                            wartosc={w.nazwa} onZmiana={(t) => ustawWiersz(w.klucz, { nazwa: t })} szukaj={szukajTowarow}
+                            onWybierz={(t) => ustawWiersz(w.klucz, {
+                              towar_id: t.id, symbol: t.symbol, nazwa: t.nazwa, jm: t.jm, gtu: t.gtu,
+                              stawka_vat_kod: dostepneStawki.some((s) => s.kod === t.stawka_vat_kod) ? t.stawka_vat_kod : domyslnaStawka,
+                            })}
+                            pokaz={(t) => (
+                              <span className="flex items-center justify-between gap-3">
+                                <span className="min-w-0"><span className="mr-2 font-mono text-xs text-neutral-500">{t.symbol}</span>{t.nazwa}</span>
+                                <span className="shrink-0 text-xs text-neutral-500">{t.typ === 'surowiec' ? 'surowiec' : 'towar'}</span>
+                              </span>
+                            )}
+                          />
+                        )}
                       </td>
                       <td className="px-2 py-2"><Wejscie aria-label={`Ilość, pozycja ${i + 1}`} inputMode="decimal" value={w.ilosc} onChange={(e) => ustawWiersz(w.klucz, { ilosc: e.target.value })} className="liczby text-right" /></td>
                       <td className="px-2 py-2"><Wejscie aria-label={`Jednostka, pozycja ${i + 1}`} value={w.jm} maxLength={10} onChange={(e) => ustawWiersz(w.klucz, { jm: e.target.value })} /></td>
@@ -354,85 +354,35 @@ function EdytorFaktury({ poczatkowa, onZapisano, onZamknij }: {
                   {(Object.keys(FORMY_PLATNOSCI) as FormaPlatnosci[]).map((f) => <option key={f} value={f}>{FORMY_PLATNOSCI[f]}</option>)}
                 </Wybor>
               </Pole>
-              <Pole etykieta="Termin płatności" className="sm:col-span-3" podpowiedz={terminReczny ? undefined : 'Liczony automatycznie'}>
+              <Pole etykieta="Termin płatności" className="sm:col-span-3" podpowiedz={terminReczny ? undefined : 'Liczony automatycznie — popraw wg faktury'}>
                 <Wejscie type="date" min={nagl.data_wystawienia} value={nagl.termin_platnosci ?? ''} onChange={(e) => { setTerminReczny(true); ustaw('termin_platnosci', e.target.value || null) }} />
               </Pole>
-              {nagl.forma_platnosci === 'przelew' && (
-                <Pole etykieta="Konto do przelewu" className="sm:col-span-6" podpowiedz={aktywneKonta.length === 0 ? 'Dodaj konto w Ustawieniach → Konta bankowe' : undefined}>
-                  <Wybor value={nagl.konto_bankowe_id ?? ''} onChange={(e) => ustaw('konto_bankowe_id', e.target.value ? Number(e.target.value) : null)}>
-                    <option value="">Domyślne konto PLN</option>
-                    {aktywneKonta.map((k) => <option key={k.id} value={k.id}>{k.nazwa} — {k.numer_sformatowany}</option>)}
-                  </Wybor>
-                </Pole>
-              )}
             </SekcjaFormularza>
           </div>
           <Podsumowanie wgStawek={podsumowanie.wgStawek} netto={podsumowanie.netto} vat={podsumowanie.vat} brutto={podsumowanie.brutto} />
         </div>
 
         <SekcjaFormularza tytul="Dodatkowe">
-          <Pole etykieta="Miejsce wystawienia" className="sm:col-span-3"><Wejscie value={nagl.miejsce_wystawienia} onChange={(e) => ustaw('miejsce_wystawienia', e.target.value)} /></Pole>
-          <Pole etykieta="Wystawił(a)" className="sm:col-span-3"><Wejscie value={nagl.wystawiajacy} onChange={(e) => ustaw('wystawiajacy', e.target.value)} /></Pole>
-          <Pole etykieta="Uwagi na fakturze" className="sm:col-span-6"><PoleTekstowe rows={2} value={nagl.uwagi} onChange={(e) => ustaw('uwagi', e.target.value)} /></Pole>
+          <Pole etykieta="Uwagi" className="sm:col-span-6"><PoleTekstowe rows={2} value={nagl.uwagi} onChange={(e) => ustaw('uwagi', e.target.value)} /></Pole>
         </SekcjaFormularza>
       </form>
     </Panel>
   )
 }
 
-export function Podsumowanie({ wgStawek, netto, vat, brutto }: {
-  wgStawek: { kod: string; nazwa: string; netto: number; vat: number }[]
-  netto: number
-  vat: number
-  brutto: number
-}) {
-  return (
-    <div className="self-start rounded-xl bg-marka-950 p-5 text-white lg:col-span-2">
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="text-left text-xs uppercase tracking-wider text-marka-300">
-            <th className="pb-2 font-medium">Stawka</th>
-            <th className="pb-2 text-right font-medium">Netto</th>
-            <th className="pb-2 text-right font-medium">VAT</th>
-          </tr>
-        </thead>
-        <tbody>
-          {wgStawek.length === 0 && <tr><td colSpan={3} className="py-1 text-marka-300">Brak pozycji</td></tr>}
-          {wgStawek.map((s) => (
-            <tr key={s.kod} className="text-marka-100">
-              <td className="py-0.5">{s.nazwa}</td>
-              <td className="liczby py-0.5 text-right">{naZlote(s.netto)}</td>
-              <td className="liczby py-0.5 text-right">{naZlote(s.vat)}</td>
-            </tr>
-          ))}
-          <tr className="border-t border-white/15 text-marka-100">
-            <td className="pt-2">Razem</td>
-            <td className="liczby pt-2 text-right">{naZlote(netto)}</td>
-            <td className="liczby pt-2 text-right">{naZlote(vat)}</td>
-          </tr>
-        </tbody>
-      </table>
-      <div className="mt-4 flex items-baseline justify-between border-t border-white/15 pt-4">
-        <span className="text-sm text-marka-200">Do zapłaty</span>
-        <span className="liczby text-2xl font-semibold tracking-tight text-zloto-300">{naZlote(brutto)} <span className="text-base font-medium">zł</span></span>
-      </div>
-    </div>
-  )
-}
-
 // ---------------------------------------------------------------- Podgląd zatwierdzonej / anulowanej
 
-function PodgladFaktury({ f, onZamknij }: { f: Faktura; onZamknij: () => void }) {
-  const anuluj = useAnulujFakture()
+function PodgladZakupu({ f, onZamknij }: { f: Zakup; onZamknij: () => void }) {
+  const anuluj = useAnulujZakup()
   const [anulowanie, setAnulowanie] = useState(false)
   const [przyczyna, setPrzyczyna] = useState('')
-  const s = f.sprzedawca ?? {}
-  const tekst = (k: string) => String((s as Record<string, unknown>)[k] ?? '')
+  const n = f.nabywca ?? {}
+  const tekst = (k: string) => String((n as Record<string, unknown>)[k] ?? '')
 
   return (
     <Panel
       szerokie
-      tytul={`Faktura VAT ${f.numer}`}
+      tytul={`Faktura zakupu ${f.numer}`}
       naglowekDodatek={<Plakietka ton={TON_STATUSU[f.status]}>{STATUSY[f.status]}</Plakietka>}
       opis={`Zatwierdzona ${f.zatwierdzono ? new Date(f.zatwierdzono).toLocaleString('pl-PL') : ''}. Zmiana tylko przez korektę lub anulowanie.`}
       onZamknij={onZamknij}
@@ -447,7 +397,7 @@ function PodgladFaktury({ f, onZamknij }: { f: Faktura; onZamknij: () => void })
         ) : (
           <>
             <Przycisk wariant="drugorzedny" onClick={onZamknij}>Zamknij</Przycisk>
-            <span className="text-xs text-neutral-500">Wydruk PDF — w kolejnym kroku.</span>
+            <span className="text-xs text-neutral-500">Przyjęcie na magazyn (PZ) i zobowiązanie — w kolejnych modułach.</span>
             {f.status === 'zatwierdzony' && (
               <Przycisk wariant="cichy" className="ml-auto !text-blad" onClick={() => setAnulowanie(true)}><Ban className="size-4" /> Anuluj fakturę</Przycisk>
             )}
@@ -456,22 +406,24 @@ function PodgladFaktury({ f, onZamknij }: { f: Faktura; onZamknij: () => void })
       }
     >
       <div className="mb-5 flex items-center gap-2 rounded-lg border border-zloto-200 bg-zloto-50 px-4 py-2 text-xs font-medium text-zloto-800">
-        <AlertTriangle className="size-4 shrink-0" /> Dokument testowy — nie jest fakturą. Obowiązujące faktury wystawia Fakturownia do czasu podłączenia KSeF.
+        <AlertTriangle className="size-4 shrink-0" /> Ewidencja testowa. Obowiązującą księgowość prowadzi Fakturownia do czasu podłączenia KSeF.
       </div>
       {f.status === 'anulowany' && (
         <div className="mb-5"><Komunikat rodzaj="blad">Anulowana {f.anulowano ? new Date(f.anulowano).toLocaleString('pl-PL') : ''}. Przyczyna: {f.przyczyna_anulowania}</Komunikat></div>
       )}
 
       <div className={`grid gap-6 sm:grid-cols-2 ${f.status === 'anulowany' ? 'opacity-60' : ''}`}>
-        <Strona tytul="Sprzedawca" linie={[tekst('nazwa'), tekst('nip') && `NIP ${tekst('nip')}`, tekst('adres_ulica'), `${tekst('kod_pocztowy')} ${tekst('miejscowosc')}`.trim()]} />
-        <Strona tytul="Nabywca" linie={[f.nabywca_nazwa, f.nabywca_nip && `NIP ${f.nabywca_nip}`, f.nabywca_adres_ulica, `${f.nabywca_kod_pocztowy} ${f.nabywca_miejscowosc}`.trim()]} />
+        <Strona tytul="Dostawca" linie={[f.dostawca_nazwa, f.dostawca_nip && `NIP ${f.dostawca_nip}`, f.dostawca_adres_ulica, `${f.dostawca_kod_pocztowy} ${f.dostawca_miejscowosc}`.trim()]} />
+        <Strona tytul="Nabywca (nasza firma)" linie={[tekst('nazwa'), tekst('nip') && `NIP ${tekst('nip')}`, tekst('adres_ulica'), `${tekst('kod_pocztowy')} ${tekst('miejscowosc')}`.trim()]} />
       </div>
 
-      <dl className="my-6 grid grid-cols-2 gap-4 rounded-lg bg-neutral-50 px-4 py-3 text-sm sm:grid-cols-4">
+      <dl className="my-6 grid grid-cols-2 gap-4 rounded-lg bg-neutral-50 px-4 py-3 text-sm sm:grid-cols-3 lg:grid-cols-6">
+        <Dana etykieta="Numer dostawcy" wartosc={f.numer_obcy} />
         <Dana etykieta="Data wystawienia" wartosc={naDate(f.data_wystawienia)} />
-        <Dana etykieta="Data sprzedaży" wartosc={naDate(f.data_sprzedazy)} />
+        <Dana etykieta="Data zakupu" wartosc={naDate(f.data_zakupu)} />
         <Dana etykieta="Płatność" wartosc={FORMY_PLATNOSCI[f.forma_platnosci]} />
         <Dana etykieta="Termin" wartosc={naDate(f.termin_platnosci)} />
+        <Dana etykieta="Nasz numer" wartosc={f.numer ?? '—'} />
       </dl>
 
       <div className="overflow-x-auto rounded-lg border border-obramowanie">
@@ -503,33 +455,10 @@ function PodgladFaktury({ f, onZamknij }: { f: Faktura; onZamknij: () => void })
 
       <div className="mt-6 grid gap-6 lg:grid-cols-5">
         <div className="space-y-3 text-sm lg:col-span-3">
-          {f.forma_platnosci === 'przelew' && f.sprzedawca?.konto && (
-            <p><span className="text-neutral-500">Konto: </span><span className="liczby font-mono">{naIban(f.sprzedawca.konto.numer)}</span>{f.sprzedawca.konto.bank && <span className="text-neutral-500"> ({f.sprzedawca.konto.bank})</span>}</p>
-          )}
-          {f.miejsce_wystawienia && <p><span className="text-neutral-500">Miejsce wystawienia: </span>{f.miejsce_wystawienia}</p>}
-          {f.wystawiajacy && <p><span className="text-neutral-500">Wystawił(a): </span>{f.wystawiajacy}</p>}
           {f.uwagi && <p className="whitespace-pre-line rounded-lg bg-neutral-50 px-3 py-2">{f.uwagi}</p>}
         </div>
         <Podsumowanie wgStawek={f.stawki} netto={f.suma_netto} vat={f.suma_vat} brutto={f.suma_brutto} />
       </div>
     </Panel>
-  )
-}
-
-export function Strona({ tytul, linie }: { tytul: string; linie: (string | false)[] }) {
-  return (
-    <div>
-      <h3 className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-neutral-500">{tytul}</h3>
-      {linie.filter(Boolean).map((l, i) => <p key={i} className={i === 0 ? 'font-semibold text-marka-950' : 'text-sm text-tekst-drugorzedny'}>{l}</p>)}
-    </div>
-  )
-}
-
-export function Dana({ etykieta, wartosc }: { etykieta: string; wartosc: string }) {
-  return (
-    <div>
-      <dt className="text-xs text-neutral-500">{etykieta}</dt>
-      <dd className="liczby font-medium text-marka-950">{wartosc}</dd>
-    </div>
   )
 }

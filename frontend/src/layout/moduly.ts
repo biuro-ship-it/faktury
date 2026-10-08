@@ -26,6 +26,7 @@ export type Modul = {
 export const PULPIT = { sciezka: '/', nazwa: 'Pulpit', ikona: LayoutDashboard }
 export const KARTOTEKI = { sciezka: '/kartoteki' }
 export const SPRZEDAZ = { sciezka: '/sprzedaz' }
+export const ZAKUPY = { sciezka: '/zakupy' }
 export const UWAGI = { sciezka: '/uwagi', nazwa: 'Uwagi', ikona: MessageSquareText }
 export const USTAWIENIA = { sciezka: '/ustawienia', nazwa: 'Ustawienia', ikona: Settings }
 
@@ -45,6 +46,7 @@ export const MODULY: Modul[] = [
   },
   {
     sciezka: '/zakupy', nazwa: 'Zakupy', ikona: ShoppingCart, faza: 2,
+    // Gotowe (szkielet): faktura zakupu towarów i surowców szkic → zatwierdzenie → anulowanie, numer dostawcy, rejestr z VAT naliczonym. Zostają: PZ (faza 4), zobowiązanie (faza 3), korekta, odliczenie VAT, import XML.
     opis: 'Faktury zakupu towarów i surowców z automatycznym przyjęciem na magazyn (PZ).',
     zakres: ['Faktura zakupu → automatyczne PZ', 'Rejestr zakupów'],
   },

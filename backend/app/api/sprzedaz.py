@@ -190,6 +190,30 @@ def _pobierz(sesja: Session, faktura_id: int, *, do_zmiany: bool = False) -> Dok
 
 # ---------------------------------------------------------------- Zapis szkicu
 
+def przygotuj_pozycje(sesja: Session, d: Dokument, dane_pozycji: list[PozycjaDane]) -> list[serwis.PozycjaWejscie]:
+    """Waliduje pozycje szkicu (ilość, stawka VAT, towar) i zamienia je na dane wejściowe serwisu.
+    Wspólne dla sprzedaży i zakupów (app/api/zakupy.py)."""
+    stawki = {s.kod: s for s in sesja.scalars(select(StawkaVat))}
+    poprzednie_stawki = {p.stawka_vat_kod for p in d.pozycje} if d.id else set()
+    pozycje: list[serwis.PozycjaWejscie] = []
+    for nr, p in enumerate(dane_pozycji, start=1):
+        nazwa, jm = p.nazwa.strip(), p.jm.strip()
+        if not nazwa or not jm:
+            raise _422(f"Pozycja {nr}: podaj nazwę i jednostkę miary")
+        if p.ilosc <= 0 or p.ilosc > MAKS_ILOSC or p.ilosc != p.ilosc.quantize(Decimal("0.0001")):
+            raise _422(f"Pozycja {nr}: ilość musi być dodatnia, najwyżej 4 miejsca po przecinku")
+        stawka = stawki.get(p.stawka_vat_kod)
+        if stawka is None:
+            raise _422(f"Pozycja {nr}: nie ma stawki VAT „{p.stawka_vat_kod}”")
+        if not stawka.aktywna and stawka.kod not in poprzednie_stawki:
+            raise _422(f"Pozycja {nr}: stawka {stawka.kod} jest wyłączona w Ustawieniach")
+        gtu = (p.gtu or "").strip().upper() or None
+        if p.towar_id is not None and sesja.get(Towar, p.towar_id) is None:
+            raise _422(f"Pozycja {nr}: nie ma takiego towaru")
+        pozycje.append(serwis.PozycjaWejscie(p.towar_id, nazwa, jm, p.ilosc, p.cena_netto, p.stawka_vat_kod, gtu))
+    return pozycje
+
+
 def _sprawdz_i_zapisz(sesja: Session, d: Dokument, dane: FakturaDane) -> None:
     """Waliduje dane szkicu i przepisuje je na dokument (z kopią danych nabywcy i pozycji)."""
     if dane.data_sprzedazy.year < 2000 or dane.data_wystawienia.year < 2000:
@@ -214,24 +238,7 @@ def _sprawdz_i_zapisz(sesja: Session, d: Dokument, dane: FakturaDane) -> None:
     if termin is not None and termin < dane.data_wystawienia:
         raise _422("Termin płatności nie może być wcześniejszy niż data wystawienia")
 
-    stawki = {s.kod: s for s in sesja.scalars(select(StawkaVat))}
-    poprzednie_stawki = {p.stawka_vat_kod for p in d.pozycje} if d.id else set()
-    pozycje: list[serwis.PozycjaWejscie] = []
-    for nr, p in enumerate(dane.pozycje, start=1):
-        nazwa, jm = p.nazwa.strip(), p.jm.strip()
-        if not nazwa or not jm:
-            raise _422(f"Pozycja {nr}: podaj nazwę i jednostkę miary")
-        if p.ilosc <= 0 or p.ilosc > MAKS_ILOSC or p.ilosc != p.ilosc.quantize(Decimal("0.0001")):
-            raise _422(f"Pozycja {nr}: ilość musi być dodatnia, najwyżej 4 miejsca po przecinku")
-        stawka = stawki.get(p.stawka_vat_kod)
-        if stawka is None:
-            raise _422(f"Pozycja {nr}: nie ma stawki VAT „{p.stawka_vat_kod}”")
-        if not stawka.aktywna and stawka.kod not in poprzednie_stawki:
-            raise _422(f"Pozycja {nr}: stawka {stawka.kod} jest wyłączona w Ustawieniach")
-        gtu = (p.gtu or "").strip().upper() or None
-        if p.towar_id is not None and sesja.get(Towar, p.towar_id) is None:
-            raise _422(f"Pozycja {nr}: nie ma takiego towaru")
-        pozycje.append(serwis.PozycjaWejscie(p.towar_id, nazwa, jm, p.ilosc, p.cena_netto, p.stawka_vat_kod, gtu))
+    pozycje = przygotuj_pozycje(sesja, d, dane.pozycje)
 
     d.seria_id = dane.seria_id
     d.kontrahent_id = dane.kontrahent_id

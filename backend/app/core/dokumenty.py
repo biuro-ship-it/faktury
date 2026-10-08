@@ -23,6 +23,10 @@ from app.models import (
 )
 
 
+TYPY_ZAKUPU = ("faktura_zakupu",)
+MAGAZYNOWE_TYPY_TOWARU = ("towar_handlowy", "surowiec")  # co można kupić fakturą zakupu (usługi — moduł Koszty)
+
+
 class BladDokumentu(Exception):
     """Błąd biznesowy — komunikat jest dla użytkownika."""
 
@@ -196,14 +200,21 @@ def braki_do_zatwierdzenia(sesja: Session, dokument: Dokument) -> list[str]:
         braki.append(f"Seria {seria.kod} nie służy do tego rodzaju dokumentu")
     elif not seria.aktywna:
         braki.append(f"Seria {seria.kod} jest wyłączona")
+    zakup = dokument.typ in TYPY_ZAKUPU
     kontrahent = sesja.get(Kontrahent, dokument.kontrahent_id) if dokument.kontrahent_id else None
     if kontrahent is None:
-        braki.append("Wybierz nabywcę")
+        braki.append("Wybierz dostawcę" if zakup else "Wybierz nabywcę")
     elif not kontrahent.aktywny:
         braki.append(f"Kontrahent „{kontrahent.nazwa}” jest wyłączony w kartotece")
+    if zakup and not dokument.numer_obcy.strip():
+        braki.append("Wpisz numer faktury dostawcy")
     pozycje = list(dokument.pozycje)
     if not pozycje:
         braki.append("Dodaj co najmniej jedną pozycję")
+    if zakup:
+        for p in pozycje:
+            if p.towar_id is None:
+                braki.append(f"Pozycja {p.lp}: wybierz towar lub surowiec z kartoteki")
     stawki = _stawki_slownik(sesja)
     for kod in sorted({p.stawka_vat_kod for p in pozycje}):
         if not stawki[kod].aktywna:
@@ -227,7 +238,8 @@ def zatwierdz(sesja: Session, dokument_id: int, *, uzytkownik_id: int) -> Dokume
     firma = sesja.get(Firma, 1)
     seria = sesja.get(SeriaNumeracji, dokument.seria_id)
     assert kontrahent and firma and seria
-    konto = _konto_do_faktury(sesja, dokument)
+    # Rachunek bankowy to rachunek SPRZEDAWCY na fakturze sprzedaży — przy zakupie nie ma czego kopiować.
+    konto = None if dokument.typ in TYPY_ZAKUPU else _konto_do_faktury(sesja, dokument)
 
     # Sumy liczymy jeszcze raz z pozycji — zatwierdzony dokument nie może mieć „starych” sum.
     zapisz_pozycje(sesja, dokument, [
@@ -254,7 +266,8 @@ def zatwierdz(sesja: Session, dokument_id: int, *, uzytkownik_id: int) -> Dokume
     zapisz_zdarzenie(
         sesja, "dokument.zatwierdzony", uzytkownik_id=uzytkownik_id, encja="dokument", encja_id=dokument.id,
         opis=dokument.numer,
-        po={"typ": dokument.typ, "numer": dokument.numer, "kontrahent_id": dokument.kontrahent_id,
+        po={"typ": dokument.typ, "numer": dokument.numer, "numer_obcy": dokument.numer_obcy,
+            "kontrahent_id": dokument.kontrahent_id,
             "data_wystawienia": dokument.data_wystawienia.isoformat(), "suma_netto": dokument.suma_netto,
             "suma_vat": dokument.suma_vat, "suma_brutto": dokument.suma_brutto},
     )

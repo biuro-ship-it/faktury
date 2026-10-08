@@ -25,6 +25,7 @@ export type Modul = {
 
 export const PULPIT = { sciezka: '/', nazwa: 'Pulpit', ikona: LayoutDashboard }
 export const KARTOTEKI = { sciezka: '/kartoteki' }
+export const SPRZEDAZ = { sciezka: '/sprzedaz' }
 export const UWAGI = { sciezka: '/uwagi', nazwa: 'Uwagi', ikona: MessageSquareText }
 export const USTAWIENIA = { sciezka: '/ustawienia', nazwa: 'Ustawienia', ikona: Settings }
 
@@ -38,6 +39,7 @@ export const MODULY: Modul[] = [
   },
   {
     sciezka: '/sprzedaz', nazwa: 'Sprzedaż', ikona: FileText, faza: 2,
+    // Gotowe (szkielet): faktura VAT szkic → zatwierdzenie → anulowanie, rejestr z sumami po stawkach. Zostają: korekta, proforma, PDF.
     opis: 'Faktury sprzedaży, korekty i proformy ze wszystkimi skutkami w jednej transakcji.',
     zakres: ['Faktura VAT, korekta, proforma', 'Szkic → zatwierdzenie → anulowanie', 'PDF faktury', 'Rejestr sprzedaży z sumami po stawkach VAT'],
   },

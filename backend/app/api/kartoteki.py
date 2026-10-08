@@ -18,7 +18,7 @@ from app.auth.zaleznosci import pobierz_uzytkownika
 from app.core.dziennik import zapisz_zdarzenie
 from app.core.walidacja import BladWalidacji, normalizuj_nip
 from app.db import pobierz_sesje
-from app.models import Kontrahent, Pracownik, StawkaVat, Towar, Uzytkownik
+from app.models import Dokument, DokumentPozycja, Kontrahent, Pracownik, StawkaVat, Towar, Uzytkownik
 
 router = APIRouter(prefix="/api/kartoteki", tags=["kartoteki"], dependencies=[Depends(pobierz_uzytkownika)])
 
@@ -336,6 +336,12 @@ def zapisz_towar(
         raise HTTPException(404, "Nie ma takiego towaru")
     nowe = _oczysc(dane)
     _sprawdz_towar(sesja, nowe, wlasny=t)
+    # Rodzaj i jednostka towaru, który jest już na zatwierdzonym dokumencie, są zamrożone — od nich
+    # zależą ewidencja i (od fazy 4) stany magazynowe. Szkice się nie liczą.
+    if (nowe["typ"], nowe["jm"]) != (t.typ, t.jm) and sesja.scalar(select(exists().where(
+        DokumentPozycja.towar_id == t.id, DokumentPozycja.dokument_id == Dokument.id, Dokument.status != "szkic",
+    ))):
+        raise HTTPException(409, "Towar jest już na zatwierdzonych dokumentach — nie można zmienić rodzaju ani jednostki miary")
     przed = _jako_dict(t, POLA_TOWARU)
     for pole, wartosc in nowe.items():
         setattr(t, pole, wartosc)

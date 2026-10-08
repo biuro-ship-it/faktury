@@ -144,8 +144,12 @@ export function Paginacja({ razem, offset, onZmiana }: { razem: number; offset: 
 
 /** Okno na środku ekranu: formularz bez opuszczania listy. Przesuwasz je za nagłówek;
  *  Esc i kliknięcie w tło zamykają. */
-export function Panel({ tytul, opis, blad, onZamknij, children, stopka }: {
+export function Panel({ tytul, opis, blad, onZamknij, children, stopka, szerokie = false, naglowekDodatek }: {
   tytul: string
+  /** Szersze okno — dokumenty z tabelą pozycji. */
+  szerokie?: boolean
+  /** Element obok tytułu, np. plakietka statusu. */
+  naglowekDodatek?: ReactNode
   opis?: string
   /** Błąd zapisu — przypięty pod nagłówkiem, żeby był widoczny także przy długim, przewiniętym formularzu. */
   blad?: string | null
@@ -201,7 +205,7 @@ export function Panel({ tytul, opis, blad, onZamknij, children, stopka }: {
         aria-modal="true"
         aria-label={tytul}
         style={{ transform: `translate(${przesuniecie.x}px, ${przesuniecie.y}px)` }}
-        className="relative flex max-h-[min(52rem,calc(100dvh-2rem))] w-full max-w-2xl animate-pojaw flex-col overflow-hidden rounded-2xl bg-powierzchnia shadow-2xl ring-1 ring-black/5"
+        className={`relative flex max-h-[min(52rem,calc(100dvh-2rem))] w-full ${szerokie ? 'max-w-5xl' : 'max-w-2xl'} animate-pojaw flex-col overflow-hidden rounded-2xl bg-powierzchnia shadow-2xl ring-1 ring-black/5`}
       >
         <header
           onPointerDown={zacznij}
@@ -214,7 +218,10 @@ export function Panel({ tytul, opis, blad, onZamknij, children, stopka }: {
           <div className="flex min-w-0 items-start gap-3">
             <GripHorizontal className="mt-1 size-4 shrink-0 text-neutral-300" aria-hidden />
             <div className="min-w-0">
-              <h2 className="truncate text-lg font-semibold tracking-tight text-marka-950">{tytul}</h2>
+              <div className="flex min-w-0 flex-wrap items-center gap-2">
+                <h2 className="truncate text-lg font-semibold tracking-tight text-marka-950">{tytul}</h2>
+                {naglowekDodatek}
+              </div>
               {opis && <p className="mt-0.5 text-sm text-tekst-drugorzedny">{opis}</p>}
             </div>
           </div>

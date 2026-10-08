@@ -27,6 +27,7 @@ export async function api<T>(sciezka: string, opcje: RequestInit = {}): Promise<
     const opis = typeof tresc?.detail === 'string' ? tresc.detail : `Błąd serwera (${odpowiedz.status})`
     throw new BladApi(odpowiedz.status, opis)
   }
+  if (odpowiedz.status === 204) return undefined as T // np. usunięcie szkicu — brak treści
   return odpowiedz.json() as Promise<T>
 }
 

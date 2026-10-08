@@ -2,7 +2,7 @@ import { ChevronRight } from 'lucide-react'
 import { Link } from 'react-router'
 import { useProfil } from '../auth/AuthProvider'
 import { NaglowekStrony } from '../layout/NaglowekStrony'
-import { MODULY } from '../layout/moduly'
+import { MODULY, USTAWIENIA } from '../layout/moduly'
 
 const KAFLE = [
   { etykieta: 'Sprzedaż w tym miesiącu', faza: 2 },
@@ -55,6 +55,19 @@ export function DashboardPage() {
                 <ChevronRight className="size-4 text-neutral-400 transition group-hover:translate-x-0.5 group-hover:text-marka-700" />
               </Link>
             ))}
+            <Link
+              to={USTAWIENIA.sciezka}
+              className="group flex items-center gap-4 rounded-xl border border-obramowanie bg-powierzchnia p-4 shadow-sm transition hover:border-marka-300 hover:shadow-md"
+            >
+              <div className="grid size-10 shrink-0 place-items-center rounded-lg bg-marka-100 text-marka-800 transition group-hover:bg-marka-900 group-hover:text-white">
+                <USTAWIENIA.ikona className="size-5" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="font-medium text-marka-950">{USTAWIENIA.nazwa}</div>
+                <div className="truncate text-xs text-tekst-drugorzedny">Firma, konta, numeracja, VAT</div>
+              </div>
+              <ChevronRight className="size-4 text-neutral-400 transition group-hover:translate-x-0.5 group-hover:text-marka-700" />
+            </Link>
           </div>
         </section>
       </div>

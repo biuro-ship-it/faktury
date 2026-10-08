@@ -1,5 +1,5 @@
-import { ChevronLeft, ChevronRight, Search, SearchX, X } from 'lucide-react'
-import { type ReactNode, useEffect, useRef, useState } from 'react'
+import { ChevronLeft, ChevronRight, GripHorizontal, Search, SearchX, X } from 'lucide-react'
+import { type PointerEvent as ReactPointerEvent, type ReactNode, useEffect, useRef, useState } from 'react'
 import { Przycisk } from './formularz'
 
 /** Wartość z opóźnieniem — szukajka nie odpytuje serwera po każdej literze. */
@@ -142,7 +142,8 @@ export function Paginacja({ razem, offset, onZmiana }: { razem: number; offset: 
   )
 }
 
-/** Panel wysuwany z prawej: formularz bez opuszczania listy. Esc i kliknięcie w tło zamykają. */
+/** Okno na środku ekranu: formularz bez opuszczania listy. Przesuwasz je za nagłówek;
+ *  Esc i kliknięcie w tło zamykają. */
 export function Panel({ tytul, opis, blad, onZamknij, children, stopka }: {
   tytul: string
   opis?: string
@@ -152,14 +153,18 @@ export function Panel({ tytul, opis, blad, onZamknij, children, stopka }: {
   children: ReactNode
   stopka?: ReactNode
 }) {
-  const panel = useRef<HTMLElement>(null)
+  const okno = useRef<HTMLElement>(null)
+  const [przesuniecie, setPrzesuniecie] = useState({ x: 0, y: 0 })
+  const [przeciaga, setPrzeciaga] = useState(false)
+  const start = useRef<{ x: number; y: number; baza: { x: number; y: number }; prostokat: DOMRect } | null>(null)
+
   useEffect(() => {
     const poprzedni = document.activeElement as HTMLElement | null
     const naKlawisz = (e: KeyboardEvent) => e.key === 'Escape' && onZamknij()
     document.addEventListener('keydown', naKlawisz)
     const przewijanie = document.body.style.overflow
     document.body.style.overflow = 'hidden'
-    panel.current?.querySelector<HTMLElement>('input:not([type=checkbox]):not([type=radio]), textarea, select')?.focus()
+    okno.current?.querySelector<HTMLElement>('input:not([type=checkbox]):not([type=radio]), textarea, select')?.focus()
     return () => {
       document.removeEventListener('keydown', naKlawisz)
       document.body.style.overflow = przewijanie
@@ -167,20 +172,51 @@ export function Panel({ tytul, opis, blad, onZamknij, children, stopka }: {
     }
   }, [onZamknij])
 
+  const zacznij = (e: ReactPointerEvent<HTMLElement>) => {
+    if (e.button !== 0 || (e.target as HTMLElement).closest('button') || !okno.current) return
+    e.currentTarget.setPointerCapture(e.pointerId)
+    start.current = { x: e.clientX, y: e.clientY, baza: przesuniecie, prostokat: okno.current.getBoundingClientRect() }
+    setPrzeciaga(true)
+  }
+  const przesun = (e: ReactPointerEvent<HTMLElement>) => {
+    const s = start.current
+    if (!s) return
+    // Nagłówek zawsze zostaje w zasięgu myszy: okna nie da się wypchnąć poza ekran.
+    const margines = 64
+    const dx = Math.min(Math.max(e.clientX - s.x, margines - s.prostokat.right), window.innerWidth - margines - s.prostokat.left)
+    const dy = Math.min(Math.max(e.clientY - s.y, -s.prostokat.top), window.innerHeight - 56 - s.prostokat.top)
+    setPrzesuniecie({ x: s.baza.x + dx, y: s.baza.y + dy })
+  }
+  const zakoncz = () => {
+    start.current = null
+    setPrzeciaga(false)
+  }
+
   return (
-    <div className="fixed inset-0 z-40 flex justify-end">
-      <div className="absolute inset-0 animate-rozjasnij bg-marka-950/30 backdrop-blur-[2px]" onClick={onZamknij} aria-hidden />
+    <div className="fixed inset-0 z-40 grid place-items-center p-4">
+      <div className="absolute inset-0 animate-rozjasnij bg-marka-950/40 backdrop-blur-[2px]" onClick={onZamknij} aria-hidden />
       <aside
-        ref={panel}
+        ref={okno}
         role="dialog"
         aria-modal="true"
         aria-label={tytul}
-        className="relative flex h-full w-full max-w-xl animate-wsuw flex-col bg-powierzchnia shadow-2xl"
+        style={{ transform: `translate(${przesuniecie.x}px, ${przesuniecie.y}px)` }}
+        className="relative flex max-h-[min(52rem,calc(100dvh-2rem))] w-full max-w-2xl animate-pojaw flex-col overflow-hidden rounded-2xl bg-powierzchnia shadow-2xl ring-1 ring-black/5"
       >
-        <header className="flex items-start justify-between gap-4 border-b border-obramowanie px-6 py-4">
-          <div className="min-w-0">
-            <h2 className="truncate text-lg font-semibold tracking-tight text-marka-950">{tytul}</h2>
-            {opis && <p className="mt-0.5 text-sm text-tekst-drugorzedny">{opis}</p>}
+        <header
+          onPointerDown={zacznij}
+          onPointerMove={przesun}
+          onPointerUp={zakoncz}
+          onPointerCancel={zakoncz}
+          title="Przeciągnij, żeby przesunąć okno"
+          className={`flex touch-none select-none items-start justify-between gap-4 border-b border-obramowanie px-6 py-4 ${przeciaga ? 'cursor-grabbing' : 'cursor-grab'}`}
+        >
+          <div className="flex min-w-0 items-start gap-3">
+            <GripHorizontal className="mt-1 size-4 shrink-0 text-neutral-300" aria-hidden />
+            <div className="min-w-0">
+              <h2 className="truncate text-lg font-semibold tracking-tight text-marka-950">{tytul}</h2>
+              {opis && <p className="mt-0.5 text-sm text-tekst-drugorzedny">{opis}</p>}
+            </div>
           </div>
           <button type="button" onClick={onZamknij} aria-label="Zamknij" className="rounded-lg p-1.5 text-neutral-500 transition hover:bg-neutral-100 hover:text-marka-900">
             <X className="size-5" />

@@ -79,14 +79,14 @@
   }
 }
 
-/* Panel boczny (kartoteki): wsuwa się z prawej, tło łagodnie ciemnieje. */
+/* Okno formularza (kartoteki): pojawia się na środku, tło łagodnie ciemnieje. */
 @theme inline {
-  --animate-wsuw: wsuw 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  --animate-pojaw: pojaw 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   --animate-rozjasnij: rozjasnij 0.2s ease-out;
 }
-@keyframes wsuw {
-  from { transform: translateX(2rem); opacity: 0; }
-  to { transform: translateX(0); opacity: 1; }
+@keyframes pojaw {
+  from { opacity: 0; scale: 0.96; }
+  to { opacity: 1; scale: 1; }
 }
 @keyframes rozjasnij {
   from { opacity: 0; }
